@@ -1,0 +1,118 @@
+{
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "fetch-dms",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "id": "fc23e251-dac5-422e-8d5a-02d2cc592744",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "position": [
+                -336,
+                96
+            ],
+            "webhookId": "fetch-dms",
+            "typeVersion": 2.1
+        },
+        {
+            "parameters": {
+                "url": "https://graph.instagram.com/v18.0/me/conversations",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "fields",
+                            "value": "participants{id,username},messages{message,from,created_time}"
+                        },
+                        {
+                            "name": "platform",
+                            "value": "instagram"
+                        },
+                        {
+                            "name": "access_token",
+                            "value": "IGAAUot1Mq8BxBZAFlFUVIwQU52dnh0cDlWdTJCelNkRjBTQUtNQTFpNGVZAWHIyeWQyb3RfdTAzUGJrNHFYbDRITF9BWEthT05oMmo1ZAWdtLTFQaS1DTzFOcDhkV0ZA1bHlZAcUZA0N29fQkQ2R1BaNmxhdDdmRFdYcThaTkYyOUxDWQZDZD"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "ce093300-117c-43f9-981f-215a4ff184fd",
+            "name": "Get IG Conversations",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                -112,
+                96
+            ],
+            "typeVersion": 4.3
+        },
+        {
+            "parameters": {
+                "jsCode": "const igData = $input.first().json;\nconst igConvos = igData?.data || [];\nconst MY_USERNAME = 'kadosh.ai';\nconst ACCESS_TOKEN = 'IGAAUot1Mq8BxBZAFlFUVIwQU52dnh0cDlWdTJCelNkRjBTQUtNQTFpNGVZAWHIyeWQyb3RfdTAzUGJrNHFYbDRITF9BWEthT05oMmo1ZAWdtLTFQaS1DTzFOcDhkV0ZA1bHlZAcUZA0N29fQkQ2R1BaNmxhdDdmRFdYcThaTkYyOUxDWQZDZD';\n\nconst conversations = [];\n\nfor (const conv of igConvos) {\n    const participants = conv.participants?.data || [];\n    const messages = conv.messages?.data || [];\n    \n    // Find the customer participant (not our account)\n    const customer = participants.find(p => p.username !== MY_USERNAME) || participants[1] || participants[0] || {};\n    const myAccount = participants.find(p => p.username === MY_USERNAME) || participants[0] || {};\n    \n    // Get the customer's IGSID from their messages (this is the ID needed for sending)\n    // Find a message from the customer and get their from.id\n    const customerMessage = messages.find(m => m.from?.id !== myAccount.id);\n    const customerIGSID = customerMessage?.from?.id || customer.id;\n    \n    // Fetch profile picture for customer\n    let profilePic = null;\n    if (customer.id) {\n        try {\n            const response = await fetch(`https://graph.instagram.com/v18.0/${customer.id}?fields=profile_pic&access_token=${ACCESS_TOKEN}`);\n            const data = await response.json();\n            profilePic = data.profile_pic || null;\n        } catch (e) {\n            // Ignore errors\n        }\n    }\n    \n    const processedMessages = messages.map(m => ({\n        id: m.id,\n        sender: m.from?.id === myAccount.id ? 'user' : 'lead',\n        content: m.message || '',\n        timestamp: m.created_time\n    })).reverse();\n    \n    conversations.push({\n        id: conv.id,\n        platform: 'instagram',\n        participantName: customer.username || 'Customer',\n        participantAvatar: profilePic,\n        participantId: customerIGSID,\n        messages: processedMessages\n    });\n}\n\nreturn [{ json: { conversations } }];"
+            },
+            "id": "9f70564e-d8c6-4644-ae95-177b8bc02f4e",
+            "name": "Process Conversations",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                112,
+                96
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ $json }}"
+            },
+            "id": "a61d32f2-cc4b-407a-9a2e-e0f0c058d0a4",
+            "name": "Respond",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "position": [
+                336,
+                96
+            ],
+            "typeVersion": 1.5
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Get IG Conversations",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get IG Conversations": {
+            "main": [
+                [
+                    {
+                        "node": "Process Conversations",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Process Conversations": {
+            "main": [
+                [
+                    {
+                        "node": "Respond",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "meta": {
+        "instanceId": "ca1553cf53638ba97d73dfe4cd7c084323c45b5bc8b4ed5514df643b86ea97c5"
+    }
+}

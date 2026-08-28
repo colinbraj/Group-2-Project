@@ -1,0 +1,522 @@
+{
+    "nodes": [
+        {
+            "parameters": {
+                "jsCode": "const post = $input.first().json;\nconst results = [];\n\n// Create an item for each platform\nfor (const platform of post.platforms) {\n  results.push({\n    json: {\n      post_id: post.id,\n      platform: platform,\n      content: post.content[platform] || '',\n      image_url: post.image_url || '',\n      original_post: post\n    }\n  });\n}\n\nreturn results;"
+            },
+            "id": "49a5d933-a17f-42f8-b8df-e81b43807ad4",
+            "name": "Split by Platform",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                -656,
+                80
+            ]
+        },
+        {
+            "parameters": {
+                "rules": {
+                    "values": [
+                        {
+                            "conditions": {
+                                "options": {
+                                    "leftValue": ""
+                                },
+                                "combinator": "and",
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.platform }}",
+                                        "rightValue": "facebook",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ]
+                            },
+                            "renameOutput": true,
+                            "outputKey": "facebook"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "leftValue": ""
+                                },
+                                "combinator": "and",
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.platform }}",
+                                        "rightValue": "instagram",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ]
+                            },
+                            "renameOutput": true,
+                            "outputKey": "instagram"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "2e71f3fe-3ba5-452c-a807-a27db12b4825",
+            "name": "Route by Platform",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3,
+            "position": [
+                -416,
+                80
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://graph.facebook.com/v24.0/491043064102186/feed",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "message",
+                            "value": "={{ $json.content }}"
+                        },
+                        {
+                            "name": "access_token",
+                            "value": "EAAMH9aZAssSABQetevBohl9zi2iWFmJikknDXJDxKw2w14NqO7D6n4AAhZC8dTRciPEqZBMlvRVB7OeEb5DrnUzLAuJjtZAvVoZCHhmJGN0JkNkh6A5LPr2hZAWmRZCv9WBqRePsa7nMCkKDwZCZBwW4ODZCM806HQ0mM10gtfZBT36ZCEY5Eee2ApPZAn9OUOqZBPiSZBtt7L0sFGTZAtJBv3Wl7wZDZD"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "30e6c6f5-dd2c-45a7-b597-effcef5872a6",
+            "name": "Post to Facebook",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                176,
+                -16
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{ $json.image_url }}",
+                            "operation": "isNotEmpty"
+                        }
+                    ]
+                }
+            },
+            "id": "a301f384-de08-418f-8e85-65e0816fd3cf",
+            "name": "Has Image?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                -176,
+                192
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "=https://graph.instagram.com/v24.0/17841472799201713/media",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "image_url",
+                            "value": "={{ $json.image_url }}"
+                        },
+                        {
+                            "name": "caption",
+                            "value": "={{ $json.content }}"
+                        },
+                        {
+                            "name": "access_token",
+                            "value": "IGAAUot1Mq8BxBZAFlFUVIwQU52dnh0cDlWdTJCelNkRjBTQUtNQTFpNGVZAWHIyeWQyb3RfdTAzUGJrNHFYbDRITF9BWEthT05oMmo1ZAWdtLTFQaS1DTzFOcDhkV0ZA1bHlZAcUZA0N29fQkQ2R1BaNmxhdDdmRFdYcThaTkYyOUxDWQZDZD"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "193d21bd-92bb-4bae-9e3c-011a516cebc7",
+            "name": "Create IG Media Container",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                16,
+                128
+            ],
+            "notes": "Step 1: Create media container"
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "=https://graph.instagram.com/v24.0/17841472799201713/media_publish",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "creation_id",
+                            "value": "={{ $json.id }}"
+                        },
+                        {
+                            "name": "access_token",
+                            "value": "IGAAUot1Mq8BxBZAFlFUVIwQU52dnh0cDlWdTJCelNkRjBTQUtNQTFpNGVZAWHIyeWQyb3RfdTAzUGJrNHFYbDRITF9BWEthT05oMmo1ZAWdtLTFQaS1DTzFOcDhkV0ZA1bHlZAcUZA0N29fQkQ2R1BaNmxhdDdmRFdYcThaTkYyOUxDWQZDZD"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "2f245a90-9b3e-464f-b107-6e52b5efe0b3",
+            "name": "Publish IG Media",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                320,
+                112
+            ],
+            "notes": "Step 2: Publish the container"
+        },
+        {
+            "parameters": {},
+            "id": "90933b4b-d9b0-4dcf-9a7a-4529553261c4",
+            "name": "Skip IG (No Image)",
+            "type": "n8n-nodes-base.noOp",
+            "typeVersion": 1,
+            "position": [
+                16,
+                352
+            ]
+        },
+        {
+            "parameters": {},
+            "id": "5cb8274f-1741-4015-9e35-b56842b4af44",
+            "name": "Merge Results",
+            "type": "n8n-nodes-base.merge",
+            "typeVersion": 2.1,
+            "position": [
+                544,
+                80
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Get the original post_id from Split by Platform\nconst postId = $('Split by Platform').first().json.post_id;\n\n// Return clean data for the update - without any 'id' field that could confuse Supabase\nreturn [{\n  json: {\n    scheduled_post_id: postId,\n    status: 'sent',\n    sent_at: new Date().toISOString()\n  }\n}];"
+            },
+            "id": "e1f83b3c-58e8-4375-8e03-bc24cb485857",
+            "name": "Prepare Update Data",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                736,
+                80
+            ]
+        },
+        {
+            "parameters": {
+                "operation": "update",
+                "tableId": "scheduled_posts",
+                "filterType": "string",
+                "filterString": "={{ 'id=eq.' + $json.scheduled_post_id }}",
+                "fieldsUi": {
+                    "fieldValues": [
+                        {
+                            "fieldId": "status",
+                            "fieldValue": "={{ $json.status }}"
+                        },
+                        {
+                            "fieldId": "sent_at",
+                            "fieldValue": "={{ $json.sent_at }}"
+                        }
+                    ]
+                }
+            },
+            "id": "6f0eac58-3fd7-485e-8158-264c719b2191",
+            "name": "Update Status to Sent",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                976,
+                80
+            ],
+            "credentials": {
+                "supabaseApi": {
+                    "id": "Mu0qM6GUtVqTxj8j",
+                    "name": "Group 2"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "inputSource": "passthrough"
+            },
+            "type": "n8n-nodes-base.executeWorkflowTrigger",
+            "typeVersion": 1.1,
+            "position": [
+                -896,
+                80
+            ],
+            "id": "929e75e2-f67d-4745-b9c7-52f446c9ae05",
+            "name": "When Executed by Another Workflow"
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "string": [
+                        {
+                            "value1": "={{ $json.image_url }}",
+                            "operation": "isNotEmpty"
+                        }
+                    ]
+                }
+            },
+            "id": "14bd7d07-0af4-469e-8937-d83cdffff5de",
+            "name": "Has Image?1",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                -240,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://graph.facebook.com/v24.0/491043064102186/photos",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "url",
+                            "value": "={{ $json.image_url }}"
+                        },
+                        {
+                            "name": "caption",
+                            "value": "={{ $json.content }}"
+                        },
+                        {
+                            "name": "access_token",
+                            "value": "EAAMH9aZAssSABQetevBohl9zi2iWFmJikknDXJDxKw2w14NqO7D6n4AAhZC8dTRciPEqZBMlvRVB7OeEb5DrnUzLAuJjtZAvVoZCHhmJGN0JkNkh6A5LPr2hZAWmRZCv9WBqRePsa7nMCkKDwZCZBwW4ODZCM806HQ0mM10gtfZBT36ZCEY5Eee2ApPZAn9OUOqZBPiSZBtt7L0sFGTZAtJBv3Wl7wZDZD"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.3,
+            "position": [
+                176,
+                -176
+            ],
+            "id": "b7479e91-d123-47d4-98e3-46443b653b52",
+            "name": "FB Photo posting"
+        },
+        {
+            "parameters": {},
+            "type": "n8n-nodes-base.wait",
+            "typeVersion": 1.1,
+            "position": [
+                176,
+                144
+            ],
+            "id": "09e94afc-9e9e-4b6e-ae8a-50b3f5dcba44",
+            "name": "Wait",
+            "webhookId": "6cc10dcc-836c-49d2-b196-17d1aed994ce"
+        }
+    ],
+    "connections": {
+        "Split by Platform": {
+            "main": [
+                [
+                    {
+                        "node": "Route by Platform",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Route by Platform": {
+            "main": [
+                [
+                    {
+                        "node": "Has Image?1",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Has Image?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Post to Facebook": {
+            "main": [
+                [
+                    {
+                        "node": "Merge Results",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Has Image?": {
+            "main": [
+                [
+                    {
+                        "node": "Create IG Media Container",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Skip IG (No Image)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Create IG Media Container": {
+            "main": [
+                [
+                    {
+                        "node": "Wait",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Publish IG Media": {
+            "main": [
+                [
+                    {
+                        "node": "Merge Results",
+                        "type": "main",
+                        "index": 1
+                    }
+                ]
+            ]
+        },
+        "Skip IG (No Image)": {
+            "main": [
+                [
+                    {
+                        "node": "Merge Results",
+                        "type": "main",
+                        "index": 1
+                    }
+                ]
+            ]
+        },
+        "Merge Results": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Update Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Update Data": {
+            "main": [
+                [
+                    {
+                        "node": "Update Status to Sent",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "When Executed by Another Workflow": {
+            "main": [
+                [
+                    {
+                        "node": "Split by Platform",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Has Image?1": {
+            "main": [
+                [
+                    {
+                        "node": "FB Photo posting",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Post to Facebook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "FB Photo posting": {
+            "main": [
+                [
+                    {
+                        "node": "Merge Results",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Wait": {
+            "main": [
+                [
+                    {
+                        "node": "Publish IG Media",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {
+        "When Executed by Another Workflow": [
+            {
+                "id": "e70c6363-5a82-4b61-a409-27b574353d58",
+                "platforms": [
+                    "facebook",
+                    "instagram"
+                ],
+                "content": {
+                    "facebook": "📊 Exciting Insights Ahead! Our latest AppScore Summary for January 2026 is packed with key information and professional insights that can help shape your strategies for the upcoming year. Discover trends, performance metrics, and forecasts that are essential for staying ahead in the competitive landscape. Join the conversation and share your thoughts on how these insights could impact your business decisions. Let's elevate our strategies together! 💡 #AppScore #Insights #BusinessGrowth",
+                    "instagram": "🚀 Ready to take your business to the next level in 2026? Our latest AppScore Summary is here! Dive into key insights that will shape your strategies this year. 📈💡 \n\nFrom trending metrics to forecasts, we've got the data that can drive your success. What are your thoughts on the upcoming trends? Share below! 👇 \n\n#AppScore #BusinessInsights #2026Trends #DataDriven #Strategy #GrowthMindset"
+                },
+                "status": "scheduled",
+                "schedule_at": "2026-01-13T10:12:00+00:00",
+                "sent_at": null,
+                "error_message": null,
+                "created_by": null,
+                "created_at": "2026-01-13T10:01:12.797512+00:00",
+                "image_url": "https://qbppaxuhhdumnudnjwtp.supabase.co/storage/v1/object/public/post-images/post_1768298472115_zav6ga.png"
+            }
+        ]
+    },
+    "meta": {
+        "templateCredsSetupCompleted": true,
+        "instanceId": "ca1553cf53638ba97d73dfe4cd7c084323c45b5bc8b4ed5514df643b86ea97c5"
+    }
+}

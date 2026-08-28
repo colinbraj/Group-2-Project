@@ -1,0 +1,301 @@
+{
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "send-reply",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "id": "2d1fb82f-3577-481c-bf39-ee1eeb26c002",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                -800,
+                112
+            ],
+            "webhookId": "send-reply"
+        },
+        {
+            "parameters": {
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "platform-field",
+                            "name": "platform",
+                            "value": "={{ $json.body?.platform ?? $json.platform ?? '' }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "comment-id-field",
+                            "name": "comment_id",
+                            "value": "={{ $json.body?.comment_id ?? $json.comment_id ?? '' }}",
+                            "type": "string"
+                        },
+                        {
+                            "id": "reply-field",
+                            "name": "reply",
+                            "value": "={{ $json.body?.reply ?? $json.reply ?? '' }}",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "extract-body-fields",
+            "name": "Extract Body Fields",
+            "type": "n8n-nodes-base.set",
+            "typeVersion": 3.4,
+            "position": [
+                -592,
+                112
+            ]
+        },
+        {
+            "parameters": {
+                "rules": {
+                    "values": [
+                        {
+                            "conditions": {
+                                "options": {
+                                    "leftValue": ""
+                                },
+                                "combinator": "and",
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.platform }}",
+                                        "rightValue": "facebook",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ]
+                            },
+                            "renameOutput": true,
+                            "outputKey": "facebook"
+                        },
+                        {
+                            "conditions": {
+                                "options": {
+                                    "leftValue": ""
+                                },
+                                "combinator": "and",
+                                "conditions": [
+                                    {
+                                        "leftValue": "={{ $json.platform }}",
+                                        "rightValue": "instagram",
+                                        "operator": {
+                                            "type": "string",
+                                            "operation": "equals"
+                                        }
+                                    }
+                                ]
+                            },
+                            "renameOutput": true,
+                            "outputKey": "instagram"
+                        }
+                    ]
+                },
+                "fallbackOutput": "extra",
+                "options": {}
+            },
+            "id": "2c2fdbcb-a967-4b10-b505-c5c6068f88ea",
+            "name": "Route by Platform",
+            "type": "n8n-nodes-base.switch",
+            "typeVersion": 3,
+            "position": [
+                -384,
+                112
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "=https://graph.facebook.com/v18.0/{{ $json.comment_id }}/comments",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "access_token",
+                            "value": "EAAMH9aZAssSABQetevBohl9zi2iWFmJikknDXJDxKw2w14NqO7D6n4AAhZC8dTRciPEqZBMlvRVB7OeEb5DrnUzLAuJjtZAvVoZCHhmJGN0JkNkh6A5LPr2hZAWmRZCv9WBqRePsa7nMCkKDwZCZBwW4ODZCM806HQ0mM10gtfZBT36ZCEY5Eee2ApPZAn9OUOqZBPiSZBtt7L0sFGTZAtJBv3Wl7wZDZD"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "message",
+                            "value": "={{ $json.reply }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "eb24d93d-684c-4c87-a25d-1d1d73f11ae9",
+            "name": "Post FB Reply",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                -160,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "=https://graph.facebook.com/v18.0/{{ $json.comment_id }}/replies",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "access_token",
+                            "value": "IGAAUot1Mq8BxBZAFlFUVIwQU52dnh0cDlWdTJCelNkRjBTQUtNQTFpNGVZAWHIyeWQyb3RfdTAzUGJrNHFYbDRITF9BWEthT05oMmo1ZAWdtLTFQaS1DTzFOcDhkV0ZA1bHlZAcUZA0N29fQkQ2R1BaNmxhdDdmRFdYcThaTkYyOUxDWQZDZD"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "message",
+                            "value": "={{ $json.reply }}"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "7186ee7b-044a-497f-a555-692925e6d63d",
+            "name": "Post IG Reply",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                -160,
+                208
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ { success: false, error: 'Unknown platform: ' + $json.platform } }}",
+                "options": {}
+            },
+            "id": "unknown-platform-response",
+            "name": "Respond Unknown Platform",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                -160,
+                400
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ { success: true, message: 'Facebook reply sent successfully', fb_response: $json } }}",
+                "options": {}
+            },
+            "id": "fb-success-response",
+            "name": "Respond FB Success",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                64,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ { success: true, message: 'Instagram reply sent successfully', ig_response: $json } }}",
+                "options": {}
+            },
+            "id": "ig-success-response",
+            "name": "Respond IG Success",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                64,
+                208
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Extract Body Fields",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extract Body Fields": {
+            "main": [
+                [
+                    {
+                        "node": "Route by Platform",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Route by Platform": {
+            "main": [
+                [
+                    {
+                        "node": "Post FB Reply",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Post IG Reply",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Respond Unknown Platform",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Post FB Reply": {
+            "main": [
+                [
+                    {
+                        "node": "Respond FB Success",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Post IG Reply": {
+            "main": [
+                [
+                    {
+                        "node": "Respond IG Success",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "meta": {
+        "templateCredsSetupCompleted": true,
+        "instanceId": "ca1553cf53638ba97d73dfe4cd7c084323c45b5bc8b4ed5514df643b86ea97c5"
+    }
+}

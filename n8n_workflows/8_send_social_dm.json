@@ -1,0 +1,131 @@
+{
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "send-dm",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "id": "66b22ed4-778e-48c6-b06a-0dc83f20d23d",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "position": [
+                -320,
+                32
+            ],
+            "webhookId": "send-dm",
+            "typeVersion": 2.1
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://graph.instagram.com/v18.0/me/messages",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "access_token",
+                            "value": "IGAAUot1Mq8BxBZAFlFUVIwQU52dnh0cDlWdTJCelNkRjBTQUtNQTFpNGVZAWHIyeWQyb3RfdTAzUGJrNHFYbDRITF9BWEthT05oMmo1ZAWdtLTFQaS1DTzFOcDhkV0ZA1bHlZAcUZA0N29fQkQ2R1BaNmxhdDdmRFdYcThaTkYyOUxDWQZDZD"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "contentType": "json",
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "recipient",
+                            "value": "={{ JSON.stringify({ id: $json.body.recipient_id }) }}"
+                        },
+                        {
+                            "name": "message",
+                            "value": "={{ JSON.stringify({ text: $json.body.message }) }}"
+                        }
+                    ]
+                },
+                "options": {
+                    "response": {
+                        "response": {
+                            "neverError": true
+                        }
+                    }
+                }
+            },
+            "id": "83b466d6-8c3e-4e0c-b426-1a87b6f7c8a5",
+            "name": "Send IG Message",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                -96,
+                32
+            ],
+            "typeVersion": 4.3
+        },
+        {
+            "parameters": {
+                "jsCode": "// Check if the API call was successful or failed\nconst input = $input.first().json;\n\n// Check for error response from Instagram API\nif (input.error) {\n  const errorCode = input.error.error_subcode || input.error.code;\n  const errorMessage = input.error.message || 'Unknown error';\n  \n  // Handle 24-hour messaging window expiration\n  if (errorCode === 2534022 || errorMessage.includes('outside of allowed window')) {\n    return [{\n      json: {\n        success: false,\n        error: 'messaging_window_expired',\n        message: 'Cannot send message: The 24-hour messaging window has expired. The user must message you first before you can reply.',\n        details: errorMessage\n      }\n    }];\n  }\n  \n  // Handle other errors\n  return [{\n    json: {\n      success: false,\n      error: 'api_error',\n      message: errorMessage,\n      code: errorCode\n    }\n  }];\n}\n\n// Success case\nreturn [{\n  json: {\n    success: true,\n    message_id: input.message_id || 'sent'\n  }\n}];"
+            },
+            "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "name": "Handle Response",
+            "type": "n8n-nodes-base.code",
+            "position": [
+                128,
+                32
+            ],
+            "typeVersion": 2
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ JSON.stringify($json) }}"
+            },
+            "id": "ebc9073d-e13b-4717-8b23-03cf94062f67",
+            "name": "Respond to Webhook",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "position": [
+                352,
+                32
+            ],
+            "typeVersion": 1.5
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "Send IG Message",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Send IG Message": {
+            "main": [
+                [
+                    {
+                        "node": "Handle Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Handle Response": {
+            "main": [
+                [
+                    {
+                        "node": "Respond to Webhook",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "meta": {
+        "instanceId": "ca1553cf53638ba97d73dfe4cd7c084323c45b5bc8b4ed5514df643b86ea97c5"
+    }
+}

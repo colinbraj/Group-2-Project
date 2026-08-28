@@ -1,0 +1,434 @@
+{
+    "nodes": [
+        {
+            "parameters": {
+                "httpMethod": "POST",
+                "path": "create-post",
+                "responseMode": "responseNode",
+                "options": {}
+            },
+            "id": "39b70ede-1101-4855-84d4-82b9eb69383e",
+            "name": "Webhook",
+            "type": "n8n-nodes-base.webhook",
+            "typeVersion": 2,
+            "position": [
+                -16,
+                -80
+            ],
+            "webhookId": "create-post"
+        },
+        {
+            "parameters": {
+                "modelId": {
+                    "__rl": true,
+                    "value": "gpt-4o-mini",
+                    "mode": "list",
+                    "cachedResultName": "GPT-4O-MINI"
+                },
+                "messages": {
+                    "values": [
+                        {
+                            "content": "You are an expert social media content creator. Create engaging, platform-optimized posts. For Facebook, use longer form content (up to 500 chars). For Instagram, focus on visual hooks and hashtags (up to 2200 chars but keep it punchy). Also create an image prompt that would make a great visual for this post. Return JSON with this exact format: {\"facebook\": \"post text\", \"instagram\": \"post text\", \"image_prompt\": \"detailed image description for DALL-E\"}",
+                            "role": "system"
+                        },
+                        {
+                            "content": "=Create social media posts for platforms: {{ $json.body?.platforms?.join(', ') || $json.platforms?.join(', ') || 'facebook, instagram' }}\n\nGoal: {{ $json.body?.goal || $json.goal || 'engagement' }}\nTone: {{ $json.body?.tone || $json.tone || 'friendly' }}\nContext: {{ $json.body?.context || $json.context || 'General brand content' }}\n\nReturn JSON with facebook content, instagram content, and an image_prompt for generating a matching image."
+                        }
+                    ]
+                },
+                "options": {
+                    "maxTokens": 800,
+                    "temperature": 0.7
+                }
+            },
+            "id": "3b10bf8e-4f6d-4fcc-90f1-80ed27d72c28",
+            "name": "AI Generate Content",
+            "type": "@n8n/n8n-nodes-langchain.openAi",
+            "typeVersion": 1.3,
+            "position": [
+                144,
+                -80
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "ZIdIl7C51kxcEldy",
+                    "name": "Group 2"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const ai = $input.first().json;\n\n// Parse AI response\nlet rawContent;\ntry {\n  const raw = ai.message?.content || ai.text || ai.output || '';\n  rawContent = typeof raw === 'string' ? JSON.parse(raw) : raw || {};\n} catch (e) {\n  console.log('Parse error:', e);\n  rawContent = {};\n}\n\n// Extract content and image prompt\nconst content = {\n  facebook: (rawContent.facebook ?? rawContent.Facebook ?? '').trim(),\n  instagram: (rawContent.instagram ?? rawContent.Instagram ?? '').trim()\n};\n\nconst imagePrompt = rawContent.image_prompt || rawContent.imagePrompt || \n  'Professional social media post image, modern design, vibrant colors';\n\n// Build platforms automatically\nconst platforms = Object.entries(content)\n  .filter(([_, text]) => text.length > 0)\n  .map(([platform]) => platform);\n\nreturn [{\n  json: {\n    platforms,\n    content,\n    image_prompt: imagePrompt,\n    status: 'draft'\n  }\n}];"
+            },
+            "id": "0e9115e0-7abf-4ed6-97cc-1fc8572489b9",
+            "name": "Parse AI Response",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                416,
+                -80
+            ]
+        },
+        {
+            "parameters": {
+                "resource": "image",
+                "model": "dall-e-3",
+                "prompt": "={{ $json.image_prompt }}",
+                "options": {
+                    "size": "1024x1024"
+                }
+            },
+            "id": "3fcaa292-7450-49b0-bac6-7f8c97234f74",
+            "name": "Generate Image (DALL-E)",
+            "type": "@n8n/n8n-nodes-langchain.openAi",
+            "typeVersion": 1.3,
+            "position": [
+                640,
+                -80
+            ],
+            "credentials": {
+                "openAiApi": {
+                    "id": "ZIdIl7C51kxcEldy",
+                    "name": "Group 2"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "// Handle DALL-E response - check for binary data OR URL\nconst dalleResponse = $input.first().json;\nconst binaryData = $input.first().binary;\nconst previousData = $('Parse AI Response').first().json;\n\nconsole.log('=== DALL-E Response Debug ===');\nconsole.log('JSON:', JSON.stringify(dalleResponse, null, 2));\nconsole.log('Has binary:', !!binaryData);\nif (binaryData) console.log('Binary keys:', Object.keys(binaryData));\n\n// Check if we have binary data (n8n downloaded the image)\nconst hasBinaryImage = binaryData && Object.keys(binaryData).length > 0;\n\nif (hasBinaryImage) {\n  console.log('Image is in binary format - will upload directly');\n  // Return a special flag to indicate binary upload path\n  return [{\n    json: {\n      has_binary_image: true,\n      temp_image_url: '', // No URL, we're using binary\n      platforms: previousData.platforms,\n      content: previousData.content,\n      status: 'draft'\n    },\n    binary: binaryData\n  }];\n}\n\n// Fallback: try to extract URL if not binary\nlet tempImageUrl = '';\n\nif (dalleResponse.data && Array.isArray(dalleResponse.data) && dalleResponse.data[0]?.url) {\n  tempImageUrl = dalleResponse.data[0].url;\n} else if (dalleResponse.url) {\n  tempImageUrl = dalleResponse.url;\n} else if (dalleResponse.images && dalleResponse.images[0]) {\n  tempImageUrl = dalleResponse.images[0].url || dalleResponse.images[0];\n} else if (dalleResponse.image) {\n  tempImageUrl = dalleResponse.image.url || dalleResponse.image;\n} else if (dalleResponse.image_url) {\n  tempImageUrl = dalleResponse.image_url;\n}\n\nconsole.log('Final temp_image_url:', tempImageUrl || 'NOT FOUND');\n\nreturn [{\n  json: {\n    has_binary_image: false,\n    temp_image_url: tempImageUrl,\n    platforms: previousData.platforms,\n    content: previousData.content,\n    status: 'draft'\n  }\n}];"
+            },
+            "id": "extract-dalle-url",
+            "name": "Extract DALL-E URL",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                864,
+                -80
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "boolean": [
+                        {
+                            "value1": "={{ $json.has_binary_image }}",
+                            "value2": true
+                        }
+                    ]
+                }
+            },
+            "id": "check-has-image",
+            "name": "Has Image URL?",
+            "type": "n8n-nodes-base.if",
+            "typeVersion": 1,
+            "position": [
+                1040,
+                -80
+            ]
+        },
+        {
+            "parameters": {
+                "url": "={{ $json.temp_image_url }}",
+                "options": {
+                    "response": {
+                        "response": {
+                            "responseFormat": "file"
+                        }
+                    }
+                }
+            },
+            "id": "download-dalle-image",
+            "name": "Download DALL-E Image",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                1216,
+                -128
+            ],
+            "notes": "Download image from temporary DALL-E URL before it expires"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Generate a unique filename for the image\nconst timestamp = Date.now();\nconst randomId = Math.random().toString(36).substring(2, 8);\nconst filename = `post_${timestamp}_${randomId}.png`;\n\n// Get the binary data - either from this node's input (binary passthrough) or from download\nconst binaryData = $input.first().binary;\n\n// Get previous data from the check node\nconst prevData = $('Has Image URL?').first().json;\n\nconsole.log('Prepare Upload - Has binary:', !!binaryData);\nconsole.log('Prepare Upload - Binary keys:', binaryData ? Object.keys(binaryData) : 'none');\n\nreturn [{\n  json: {\n    filename: filename,\n    platforms: prevData.platforms,\n    content: prevData.content,\n    status: prevData.status\n  },\n  binary: binaryData\n}];"
+            },
+            "id": "prepare-storage-upload",
+            "name": "Prepare Storage Upload",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1392,
+                -128
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "=https://qbppaxuhhdumnudnjwtp.supabase.co/storage/v1/object/post-images/{{ $json.filename }}",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Authorization",
+                            "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFicHBheHVoaGR1bW51ZG5qd3RwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NjQ3NzgzMywiZXhwIjoyMDgyMDUzODMzfQ.-NYqlsbSculwus7DXChW7X7zpDwSD3evT0vMgmJSM94"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "image/png"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "contentType": "binaryData",
+                "inputDataFieldName": "data",
+                "options": {}
+            },
+            "id": "upload-to-storage",
+            "name": "Upload to Supabase Storage",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                1568,
+                -128
+            ],
+            "notes": "Upload image to Supabase Storage for permanent public URL"
+        },
+        {
+            "parameters": {
+                "jsCode": "// Construct the permanent public URL\nconst filename = $('Prepare Storage Upload').first().json.filename;\nconst prevData = $('Prepare Storage Upload').first().json;\n\n// Supabase Storage public URL format\nconst permanentUrl = `https://qbppaxuhhdumnudnjwtp.supabase.co/storage/v1/object/public/post-images/${filename}`;\n\nreturn [{\n  json: {\n    platforms: prevData.platforms,\n    content: prevData.content,\n    image_url: permanentUrl,\n    status: prevData.status\n  }\n}];"
+            },
+            "id": "build-permanent-url",
+            "name": "Build Permanent URL",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1744,
+                -128
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// No image case - pass through with empty image_url\nconst prevData = $('Has Image URL?').first().json;\n\nreturn [{\n  json: {\n    platforms: prevData.platforms,\n    content: prevData.content,\n    image_url: '',\n    status: prevData.status\n  }\n}];"
+            },
+            "id": "no-image-passthrough",
+            "name": "No Image Passthrough",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                1216,
+                0
+            ]
+        },
+        {
+            "parameters": {},
+            "id": "merge-image-paths",
+            "name": "Merge Paths",
+            "type": "n8n-nodes-base.merge",
+            "typeVersion": 2.1,
+            "position": [
+                1920,
+                -80
+            ]
+        },
+        {
+            "parameters": {
+                "tableId": "scheduled_posts",
+                "fieldsUi": {
+                    "fieldValues": [
+                        {
+                            "fieldId": "platforms",
+                            "fieldValue": "={{ $json.platforms }}"
+                        },
+                        {
+                            "fieldId": "content",
+                            "fieldValue": "={{ $json.content }}"
+                        },
+                        {
+                            "fieldId": "image_url",
+                            "fieldValue": "={{ $json.image_url }}"
+                        },
+                        {
+                            "fieldId": "status",
+                            "fieldValue": "={{ $json.status }}"
+                        }
+                    ]
+                }
+            },
+            "id": "aef2e962-17ec-4674-bec0-6781789febfa",
+            "name": "Save to Supabase",
+            "type": "n8n-nodes-base.supabase",
+            "typeVersion": 1,
+            "position": [
+                2096,
+                -80
+            ],
+            "alwaysOutputData": true,
+            "credentials": {
+                "supabaseApi": {
+                    "id": "Mu0qM6GUtVqTxj8j",
+                    "name": "Group 2"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "respondWith": "json",
+                "responseBody": "={{ { success: true, message: 'Post created with AI-generated image', post_id: $json.id, image_url: $('Merge Paths').first().json.image_url, content: $('Merge Paths').first().json.content } }}",
+                "options": {}
+            },
+            "id": "3ca5a2cd-b812-4453-b818-dd49d38d1a9a",
+            "name": "Respond Success",
+            "type": "n8n-nodes-base.respondToWebhook",
+            "typeVersion": 1,
+            "position": [
+                2272,
+                -80
+            ]
+        }
+    ],
+    "connections": {
+        "Webhook": {
+            "main": [
+                [
+                    {
+                        "node": "AI Generate Content",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "AI Generate Content": {
+            "main": [
+                [
+                    {
+                        "node": "Parse AI Response",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Parse AI Response": {
+            "main": [
+                [
+                    {
+                        "node": "Generate Image (DALL-E)",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Generate Image (DALL-E)": {
+            "main": [
+                [
+                    {
+                        "node": "Extract DALL-E URL",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extract DALL-E URL": {
+            "main": [
+                [
+                    {
+                        "node": "Has Image URL?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Has Image URL?": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Storage Upload",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "No Image Passthrough",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Storage Upload": {
+            "main": [
+                [
+                    {
+                        "node": "Upload to Supabase Storage",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Upload to Supabase Storage": {
+            "main": [
+                [
+                    {
+                        "node": "Build Permanent URL",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Build Permanent URL": {
+            "main": [
+                [
+                    {
+                        "node": "Merge Paths",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "No Image Passthrough": {
+            "main": [
+                [
+                    {
+                        "node": "Merge Paths",
+                        "type": "main",
+                        "index": 1
+                    }
+                ]
+            ]
+        },
+        "Merge Paths": {
+            "main": [
+                [
+                    {
+                        "node": "Save to Supabase",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Save to Supabase": {
+            "main": [
+                [
+                    {
+                        "node": "Respond Success",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "meta": {
+        "templateCredsSetupCompleted": true,
+        "instanceId": "ca1553cf53638ba97d73dfe4cd7c084323c45b5bc8b4ed5514df643b86ea97c5"
+    }
+}

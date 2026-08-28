@@ -1,0 +1,243 @@
+{
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "minutes"
+                        }
+                    ]
+                }
+            },
+            "id": "0728fa96-e908-4de6-a6ee-cf88b4e83b71",
+            "name": "Every 5 Minutes",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "typeVersion": 1.1,
+            "position": [
+                -224,
+                112
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://graph.facebook.com/v18.0/491043064102186/feed",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "fields",
+                            "value": "id,from{id,name},message,created_time,comments.limit(50){id,from{id,name},message,created_time}"
+                        },
+                        {
+                            "name": "limit",
+                            "value": "5"
+                        },
+                        {
+                            "name": "access_token",
+                            "value": "EAAMH9aZAssSABQetevBohl9zi2iWFmJikknDXJDxKw2w14NqO7D6n4AAhZC8dTRciPEqZBMlvRVB7OeEb5DrnUzLAuJjtZAvVoZCHhmJGN0JkNkh6A5LPr2hZAWmRZCv9WBqRePsa7nMCkKDwZCZBwW4ODZCM806HQ0mM10gtfZBT36ZCEY5Eee2ApPZAn9OUOqZBPiSZBtt7L0sFGTZAtJBv3Wl7wZDZD"
+                        },
+                        {
+                            "name": "pages_read_engagement",
+                            "value": "EAAMH9aZAssSABQetevBohl9zi2iWFmJikknDXJDxKw2w14NqO7D6n4AAhZC8dTRciPEqZBMlvRVB7OeEb5DrnUzLAuJjtZAvVoZCHhmJGN0JkNkh6A5LPr2hZAWmRZCv9WBqRePsa7nMCkKDwZCZBwW4ODZCM806HQ0mM10gtfZBT36ZCEY5Eee2ApPZAn9OUOqZBPiSZBtt7L0sFGTZAtJBv3Wl7wZDZD"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "9db95b3f-0be1-4e7e-b22b-09504ac5aee0",
+            "name": "Get FB Posts",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                0,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "url": "https://graph.instagram.com/v24.0/17841472799201713/media",
+                "sendQuery": true,
+                "queryParameters": {
+                    "parameters": [
+                        {
+                            "name": "fields",
+                            "value": "id,username,caption,media_type,media_url,timestamp,comments.limit(50){id,from{id,username},text,timestamp,username}"
+                        },
+                        {
+                            "name": "limit",
+                            "value": "5"
+                        },
+                        {
+                            "name": "access_token",
+                            "value": "IGAAUot1Mq8BxBZAFlFUVIwQU52dnh0cDlWdTJCelNkRjBTQUtNQTFpNGVZAWHIyeWQyb3RfdTAzUGJrNHFYbDRITF9BWEthT05oMmo1ZAWdtLTFQaS1DTzFOcDhkV0ZA1bHlZAcUZA0N29fQkQ2R1BaNmxhdDdmRFdYcThaTkYyOUxDWQZDZD"
+                        }
+                    ]
+                },
+                "options": {}
+            },
+            "id": "cf681cec-21ca-42b7-bf4b-d771120ad3f9",
+            "name": "Get IG Media",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                0,
+                208
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Normalize Facebook comments\nconst fbPosts = $('Get FB Posts').first().json.data || [];\nconst fbComments = [];\n\nfor (const post of fbPosts) {\n  if (post.comments && post.comments.data) {\n    for (const comment of post.comments.data) {\n      fbComments.push({\n        platform: 'facebook',\n        post_id: post.id,\n        comment_id: comment.id,\n        author: comment.from?.name || 'Unknown',\n        message: comment.message,\n        created_at: comment.created_time,\n        reply_status: 'new'\n      });\n    }\n  }\n}\n\nreturn fbComments.map(c => ({ json: c }));"
+            },
+            "id": "c8de8f23-b233-42ac-8074-438746a31d6b",
+            "name": "Normalize FB Comments",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                224,
+                0
+            ]
+        },
+        {
+            "parameters": {
+                "jsCode": "// Normalize Instagram comments (when comments are included in Get IG Media)\nconst igMedia = $('Get IG Media').first().json.data || [];\nconst igComments = [];\n\nfor (const media of igMedia) {\n  const comments = media.comments?.data || [];\n  for (const comment of comments) {\n    // Try multiple sources for username: from.username, direct username, or 'Unknown'\n    const username = comment.from?.username || comment.username || 'Unknown';\n    igComments.push({\n      platform: 'instagram',\n      post_id: media.id,\n      comment_id: comment.id,\n      author: username,\n      message: comment.text || '',\n      created_at: comment.timestamp || '',\n      reply_status: 'new'\n    });\n  }\n}\n\nreturn igComments.map(c => ({ json: c }));"
+            },
+            "id": "7b40aa2b-01d5-42d4-be0f-e6516f3fd5cc",
+            "name": "Normalize IG Comments",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                224,
+                208
+            ]
+        },
+        {
+            "parameters": {},
+            "id": "0a63f96f-814d-4c57-b30c-93d7a65af62b",
+            "name": "Merge All Comments",
+            "type": "n8n-nodes-base.merge",
+            "typeVersion": 2.1,
+            "position": [
+                448,
+                112
+            ]
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://qbppaxuhhdumnudnjwtp.supabase.co/rest/v1/social_comments?on_conflict=platform,comment_id",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "apikey",
+                            "value": "={{ $env.SUPABASE_API_KEY }}"
+                        },
+                        {
+                            "name": "Authorization",
+                            "value": "=Bearer {{ $env.SUPABASE_API_KEY }}"
+                        },
+                        {
+                            "name": "Content-Type",
+                            "value": "application/json"
+                        },
+                        {
+                            "name": "Prefer",
+                            "value": "resolution=merge-duplicates"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify($input.all().map(item => item.json)) }}",
+                "options": {}
+            },
+            "id": "9ab03f4b-2469-44bd-9415-785c4f7184e6",
+            "name": "Upsert to Supabase",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.1,
+            "position": [
+                672,
+                112
+            ]
+        }
+    ],
+    "connections": {
+        "Every 5 Minutes": {
+            "main": [
+                [
+                    {
+                        "node": "Get FB Posts",
+                        "type": "main",
+                        "index": 0
+                    },
+                    {
+                        "node": "Get IG Media",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get FB Posts": {
+            "main": [
+                [
+                    {
+                        "node": "Normalize FB Comments",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Get IG Media": {
+            "main": [
+                [
+                    {
+                        "node": "Normalize IG Comments",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Normalize FB Comments": {
+            "main": [
+                [
+                    {
+                        "node": "Merge All Comments",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Normalize IG Comments": {
+            "main": [
+                [
+                    {
+                        "node": "Merge All Comments",
+                        "type": "main",
+                        "index": 1
+                    }
+                ]
+            ]
+        },
+        "Merge All Comments": {
+            "main": [
+                [
+                    {
+                        "node": "Upsert to Supabase",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "pinData": {},
+    "meta": {
+        "templateCredsSetupCompleted": true,
+        "instanceId": "ca1553cf53638ba97d73dfe4cd7c084323c45b5bc8b4ed5514df643b86ea97c5"
+    }
+}
